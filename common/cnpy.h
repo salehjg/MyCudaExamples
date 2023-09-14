@@ -18,7 +18,6 @@
 #include<memory>
 #include<cstdint>
 #include<numeric>
-#include "common/GlobalHelpers.h"
 
 namespace cnpy {
 
@@ -155,7 +154,7 @@ namespace cnpy {
             global_header.resize(global_header_size);
             size_t res = fread(&global_header[0],sizeof(char),global_header_size,fp);
             if(res != global_header_size){
-                ThrowException("npz_save: header read error while adding to existing zip");
+                throw std::runtime_error("npz_save: header read error while adding to existing zip");
             }
             fseek(fp,global_header_offset,SEEK_SET);
         }

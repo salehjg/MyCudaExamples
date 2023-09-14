@@ -1,4 +1,4 @@
-add_library(common "")
+add_library(common "" ../example1/kernel1.cu ../example1/main.cpp)
 target_sources(common
         PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/cnpy.cpp
@@ -13,3 +13,4 @@ target_link_libraries(common
         PRIVATE
         z
         )
+set_target_properties(common PROPERTIES CUDA_ARCHITECTURES "${CUDA_ARCHS}")
