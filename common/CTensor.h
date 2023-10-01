@@ -23,8 +23,8 @@ enum class FillTypes {
 template<typename T>
 class CTensor {
 protected:
-    const std::vector<size_t> m_vShape;
-    const size_t m_ulSize, m_ulSizeBytes;
+    std::vector<size_t> m_vShape;
+    size_t m_ulSize, m_ulSizeBytes;
     T *m_ptrDataDevice;
     T *m_ptrDataHost;
 
@@ -45,15 +45,89 @@ protected:
     }
 
 public:
-    CTensor(const std::vector<size_t> &shape) : m_vShape(shape), m_ulSize(_GetSize(shape)),
-                                                m_ulSizeBytes(_GetSizeBytes(shape)) {
+    CTensor(const std::vector<size_t> &shape) {
+        m_vShape = shape;
+        m_ulSize = _GetSize(shape);
+        m_ulSizeBytes = _GetSizeBytes(shape);
         m_ptrDataHost = new T[m_ulSize];
-        CHECK(cudaMalloc((void**)&m_ptrDataDevice, m_ulSizeBytes));
+        CHECK(cudaMalloc((void **) &m_ptrDataDevice, m_ulSizeBytes));
     }
 
     ~CTensor() {
         delete[] m_ptrDataHost;
         CHECK(cudaFree(m_ptrDataDevice));
+    }
+
+    // copy ctor
+    CTensor(const CTensor<T> &other) {
+        m_vShape = other.m_vShape;
+        m_ulSize = _GetSize(other.m_vShape);
+        m_ulSizeBytes = _GetSizeBytes(other.m_vShape);
+
+        m_ptrDataHost = new T[m_ulSize];
+        CHECK(cudaMalloc((void **) &m_ptrDataDevice, m_ulSizeBytes));
+
+        std::copy(other.m_ptrDataHost, other.m_ptrDataHost + other.m_ulSize, m_ptrDataHost);
+        CHECK(cudaMemcpy(m_ptrDataDevice, other.m_ptrDataDevice, m_ulSizeBytes, cudaMemcpyDeviceToDevice));
+    }
+
+    // copy assignment
+    CTensor &operator=(const CTensor &other) {
+        if (this == &other) return *this;
+
+        // This is not a ctor, so we have to release previously allocated resources.
+        delete[] m_ptrDataHost;
+        CHECK(cudaFree(m_ptrDataDevice));
+
+        // And here we have to copy the content from `other` to `this`.
+        m_vShape = other.m_vShape;
+        m_ulSize = _GetSize(other.m_vShape);
+        m_ulSizeBytes = _GetSizeBytes(other.m_vShape);
+
+        m_ptrDataHost = new T[m_ulSize];
+        CHECK(cudaMalloc((void **) &m_ptrDataDevice, m_ulSizeBytes));
+
+        std::copy(other.m_ptrDataHost, other.m_ptrDataHost + other.m_ulSize, m_ptrDataHost);
+        CHECK(cudaMemcpy(m_ptrDataDevice, other.m_ptrDataDevice, m_ulSizeBytes, cudaMemcpyDeviceToDevice));
+
+        return *this;
+    }
+
+    // move ctor
+    CTensor(CTensor<T> &&other) noexcept {
+        m_vShape = std::move(other.m_vShape);
+        m_ulSize = _GetSize(m_vShape);
+        m_ulSizeBytes = _GetSizeBytes(m_vShape);
+        other.m_ulSize = other.m_ulSizeBytes = 0;
+
+        m_ptrDataHost = other.m_ptrDataHost;
+        other.m_ptrDataHost = nullptr;
+
+        m_ptrDataDevice = other.m_ptrDataDevice;
+        other.m_ptrDataDevice = nullptr;
+    }
+
+    // move assignment
+    CTensor &operator=(CTensor<T> &&other) noexcept {
+        if (this == &other) return *this;
+
+        // This is not a ctor, so we have to release previously allocated resources.
+        delete[] m_ptrDataHost;
+        CHECK(cudaFree(m_ptrDataDevice));
+
+        // And here we have to copy the content from `other` to `this`.
+        m_vShape = std::move(other.m_vShape);
+        m_ulSize = _GetSize(m_vShape);
+        m_ulSizeBytes = _GetSizeBytes(m_vShape);
+        other.m_ulSize = other.m_ulSizeBytes = 0;
+
+        m_ptrDataHost = other.m_ptrDataHost;
+        other.m_ptrDataHost = nullptr;
+
+        m_ptrDataDevice = other.m_ptrDataDevice;
+        other.m_ptrDataDevice = nullptr;
+
+        return *this;
     }
 
     T &operator[](size_t rowMajorIndex) {
@@ -104,8 +178,9 @@ public:
         return m_ulSizeBytes;
     }
 
-    T* GetPtrHost() {return m_ptrDataHost;}
-    T* GetPtrDevice() {return m_ptrDataDevice;}
+    T *GetPtrHost() { return m_ptrDataHost; }
+
+    T *GetPtrDevice() { return m_ptrDataDevice; }
 };
 
 
