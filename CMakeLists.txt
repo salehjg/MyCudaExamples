@@ -15,7 +15,6 @@ if(NOT DEFINED CMAKE_CUDA_STANDARD)
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
     set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "-g -G")  # -G enables device debugging (its a nvcc only flag)
 endif()
 

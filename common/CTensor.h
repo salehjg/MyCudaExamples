@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <random>
 #include <cuda_runtime.h>
+#include "CRandFiller.h"
 
 #define CHECK(E) if(E!=cudaError_t::cudaSuccess) std::cerr<<"CUDA API FAILED, File: "<<__FILE__<<", Line: "<< __LINE__ << ", Error: "<< cudaGetErrorString(E) << std::endl;
 
@@ -36,12 +37,6 @@ protected:
 
     static size_t _GetSizeBytes(const std::vector<size_t> &shape) {
         return _GetSize(shape) * sizeof(T);
-    }
-
-    static T RandomValue(T minVal, T maxVal) {
-        std::mt19937 rng;
-        std::uniform_real_distribution<float> u(minVal, maxVal);
-        return u(rng);
     }
 
 public:
@@ -134,6 +129,10 @@ public:
         return m_ptrDataHost[rowMajorIndex];
     }
 
+    T operator[](size_t rowMajorIndex) const {
+        return m_ptrDataHost[rowMajorIndex];
+    }
+
     void H2D() {
         // dest ptr, src ptr, size bytes, enum
         CHECK(cudaMemcpy(m_ptrDataDevice, m_ptrDataHost, m_ulSizeBytes, cudaMemcpyHostToDevice));
@@ -144,10 +143,11 @@ public:
         CHECK(cudaMemcpy(m_ptrDataHost, m_ptrDataDevice, m_ulSizeBytes, cudaMemcpyDeviceToHost));
     }
 
-    void Fill(const FillTypes &type) {
+    void Fill(CRandFiller<T> *randFiller, const FillTypes &type) {
         switch (type) {
             case FillTypes::kRandom: {
-                for (size_t i = 0; i < m_ulSize; i++) { m_ptrDataHost[i] = RandomValue(0.0f, 100.0f); }
+                assert(randFiller != nullptr);
+                for (size_t i = 0; i < m_ulSize; i++) { m_ptrDataHost[i] = randFiller->GetRand(); }
                 break;
             }
             case FillTypes::kIncr: {
@@ -170,17 +170,37 @@ public:
         H2D();
     }
 
-    size_t GetSize() {
+    size_t GetSize() const {
         return m_ulSize;
     }
 
-    size_t GetSizeBytes() {
+    size_t GetSizeBytes() const {
         return m_ulSizeBytes;
+    }
+
+    size_t GetRank() const {
+        return m_vShape.size();
     }
 
     T *GetPtrHost() { return m_ptrDataHost; }
 
     T *GetPtrDevice() { return m_ptrDataDevice; }
+
+    const T *GetPtrHost() const { return m_ptrDataHost; }
+
+    const T *GetPtrDevice() const { return m_ptrDataDevice; }
+
+    bool CompareHostData(const CTensor<T> &other, T maxAllowedError) {
+        if (m_vShape != other.m_vShape) return false;
+        for (size_t idx=0; idx<m_ulSize; idx++) {
+            auto diff = m_ptrDataHost[idx] - other.m_ptrDataHost[idx];
+            if (diff < 0) {diff = -1 * diff;}
+            if (diff > maxAllowedError) {
+                return false; //early termination
+            }
+        }
+        return true;
+    }
 };
 
 

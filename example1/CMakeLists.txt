@@ -1,11 +1,16 @@
-set(KERNEL 1)
-add_executable(example1
-        "kernels/${KERNEL}/kernel.cu"
+set(target_name "VectorAddition")
+set(KERNEL_EXAMPLE1 1 CACHE STRING "Integer specifying the kernel version to be used in the compilation of example ${target_name}.")
+
+
+set(kernel_version ${KERNEL_EXAMPLE1})
+add_executable(${target_name}
+        "kernels/${kernel_version}/kernel.cu"
         main.cpp
         kernels/1/kernel.h)
-target_include_directories(example1
+target_include_directories(${target_name}
         PRIVATE
-        "kernels/${KERNEL}/"
+        "kernels/${kernel_version}/"
         )
-target_link_libraries(example1 common)
-set_target_properties(example1 PROPERTIES CUDA_ARCHITECTURES "${CUDA_ARCHS}")
+target_link_libraries(${target_name} common)
+set_target_properties(${target_name} PROPERTIES CUDA_ARCHITECTURES "${CUDA_ARCHS}")
+target_compile_definitions(${target_name} PRIVATE TARGETNAME=\"${target_name}\" TARGETKERNEL=\"${kernel_version}\")

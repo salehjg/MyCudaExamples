@@ -2,11 +2,16 @@
 // Created by saleh on 9/17/23.
 //
 
-#ifndef FARADARSCUDABASICS_COMMON_H
-#define FARADARSCUDABASICS_COMMON_H
+#pragma once
+
+#include <iostream>
 
 #include "CTensor.h"
+#include "CRandFiller.h"
 
+constexpr float MAX_ERR_FLOAT = 0.00000001f;
 
-
-#endif //FARADARSCUDABASICS_COMMON_H
+void PrintHeader() {
+    std::cout << "Example Name: " << TARGETNAME << std::endl;
+    std::cout << "Compiled Kernel Version: " << TARGETKERNEL << std::endl;
+}
