@@ -2,17 +2,16 @@
 // Created by saleh on 9/17/23.
 //
 
-#ifndef FARADARSCUDABASICS_CTENSOR_H
-#define FARADARSCUDABASICS_CTENSOR_H
+#pragma once
 
 #include <iostream>
 #include <vector>
 #include <algorithm>
 #include <random>
 #include <cuda_runtime.h>
-#include "CRandFiller.h"
 
-#define CHECK(E) if(E!=cudaError_t::cudaSuccess) std::cerr<<"CUDA API FAILED, File: "<<__FILE__<<", Line: "<< __LINE__ << ", Error: "<< cudaGetErrorString(E) << std::endl;
+#include "common.h"
+#include "CRandFiller.h"
 
 enum class FillTypes {
     kRandom,
@@ -202,6 +201,3 @@ public:
         return true;
     }
 };
-
-
-#endif //FARADARSCUDABASICS_CTENSOR_H

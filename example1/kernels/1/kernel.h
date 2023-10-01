@@ -4,4 +4,6 @@
 
 #pragma once
 
-extern void LaunchVecAdd(unsigned blockSize, size_t len, const float *i1, const float *i2, float *i3);
+#include <iostream>
+
+extern float LaunchVecAdd(unsigned blockSize, size_t len, const float *i1, const float *i2, float *i3);

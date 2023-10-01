@@ -3,9 +3,12 @@
 //
 
 #include <cassert>
+#include <iostream>
 
-#include "common.h"
 #include "kernel.h"
+#include "common.h"
+#include "CTensor.h"
+#include "CRandFiller.h"
 
 CTensor<float> computeGold(const CTensor<float> &tnIn1, const CTensor<float> &tnIn2) {
     assert(tnIn1.GetRank() == tnIn2.GetRank() == 1);
