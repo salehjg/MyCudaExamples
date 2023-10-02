@@ -69,7 +69,10 @@ void BasicOps(
 
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
     size_t idx, idxS2;
-    auto indices = new size_t[rank1];
+
+    //auto indices = new size_t[rank1];
+    assert(rank1 < 5);
+    size_t indices[5];
 
     for (size_t i = 0; i < iterPerThread; i++) {
         idx = tid * iterPerThread + i;
@@ -91,7 +94,7 @@ void BasicOps(
     // VERY IMPORTANT: any local memory allocated with `new[]` in the kernel should be `delete[]`ed at the end of the kernel.
     // These dynamically allocated local arrays stay on the global memory even after the kernel's excuted.
     // For example if you comment out the next line below, the kernel will crash for input tensor with large shapes.
-    delete[] indices;
+    //delete[] indices;
 }
 
 /**

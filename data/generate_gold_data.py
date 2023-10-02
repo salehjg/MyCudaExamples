@@ -27,4 +27,4 @@ def gen_gold_example2(shape1):
         np.save("golds/example2/tno.%d.div.npy" % i, out_all_div[i])
 
 
-gen_gold_example2([2, 32, 2, 1024])
+gen_gold_example2([2, 32, 2, 10240])
