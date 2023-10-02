@@ -8,6 +8,7 @@
 #include "kernel.h"
 
 inline __device__ float PerformOperation(BasicOperations op, float in1, float in2) {
+    assert(op == BasicOperations::kAdd || op == BasicOperations::kSub || op == BasicOperations::kMul || op == BasicOperations::kDiv);
     return
             op == BasicOperations::kAdd ? in1 + in2 :
             op == BasicOperations::kSub ? in1 - in2 :
@@ -32,9 +33,16 @@ inline __device__ size_t ComputeAxisIndex(int axis, size_t idx, const size_t *sl
     // here, since our `__device__` function is inline, we can use assert() without problems.
     assert(axis < rank1);
 
+    //printf("ComputeAxisIndex: axis=%d, idx=%lu, rank1=%d\n", axis, idx, rank1);
+    //printf("slice[0..3]=%lu, %lu, %lu, %lu\n", sliceLens[0], sliceLens[1], sliceLens[2], sliceLens[3]);
+
     if (axis == 0) {
+        //printf("ComputeAxisIndex##: axis=%d, idx=%lu, retVal=%lu\n", axis, idx, idx / sliceLens[axis]);
         return idx / sliceLens[axis];
     } else {
+        //printf("ComputeAxisIndex####: axis=%d, idx=%lu, retVal=%lu\n", axis, idx, ((idx % sliceLens[axis - 1]) / sliceLens[axis]));
+        //if (idx==1)
+        //    printf("axis=%d, len1=%lu, len2=%lu\n", axis,  sliceLens[axis - 1], sliceLens[axis]);
         return (idx % sliceLens[axis - 1]) / sliceLens[axis];
     }
 }
@@ -56,9 +64,9 @@ inline __device__ size_t ComputeAxisIndex(int axis, size_t idx, const size_t *sl
  */
 __global__
 void BasicOps(
-        const float *pIn1,
-        const float *pIn2,
-        float *pOut1,
+        const float * __restrict__ pIn1,
+        const float * __restrict__ pIn2,
+        float * __restrict__ pOut1,
         int rank1,
         int rank2,
         size_t sizeIn1,
@@ -77,11 +85,16 @@ void BasicOps(
         if (idx >= sizeIn1) continue;
 
         for (int axis = 0; axis < rank1; axis++) {
-            indices[axis] = ComputeAxisIndex(axis, idx, sliceLens, rank1);
+            auto d = ComputeAxisIndex(axis, idx, sliceLens, rank1);
+            //printf("######## idx=%lu, axis=%d, d=%lu\n", idx, axis, d);
+            indices[axis] = d;
         }
 
         idxS2 = 0;
         for (int axis = rank1 - rank2; axis < rank1; axis++) {
+            //if (idx==1){
+            //    printf("**** 1) %lu, 2) %lu\n", indices[axis], sliceLens[axis]);
+            //}
             idxS2 += indices[axis] * sliceLens[axis];
         }
 
@@ -91,6 +104,10 @@ void BasicOps(
         pOut1[idx] = PerformOperation(op, pIn1[idx], pIn2[idxS2]);
     }
 
+    // VERY IMPORTANT: any local memory allocated with `new[]` in the kernel should be `delete[]`ed at the end of the kernel.
+    // These dynamically allocated local arrays stay on the global memory even after the kernel's excuted.
+    // For example if you comment out the next line below, the kernel will crash for input tensor with large shapes.
+    delete[] indices;
 }
 
 /**

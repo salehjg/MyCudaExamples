@@ -44,7 +44,7 @@ void RunKernel(CTensor<float> &tnOut, const CTensor<float> &tn1, const CTensor<f
     // For CUDA, max threads per block is 1024 (even for 3D blocks).
     // Maximum number of blocks is 65535 for each axis of 1D, 2D, or 3D grid.
 
-    int blockSize = 256;
+    int blockSize = 32;
     int itersPerThread = std::ceil((float) tn1.GetSize() / (65535.0f * (float) blockSize));
     size_t grid = (tn1.GetSize() - 1) / blockSize + 1;
     auto sliceLengths = GetSliceLengths(tn1.GetShape());
