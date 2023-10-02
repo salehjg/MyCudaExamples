@@ -169,6 +169,10 @@ public:
         H2D();
     }
 
+    std::vector<size_t> GetShape() const {
+        return m_vShape;
+    }
+
     size_t GetSize() const {
         return m_ulSize;
     }
@@ -199,5 +203,16 @@ public:
             }
         }
         return true;
+    }
+
+    void CopyHostDataFrom(const T* buff) {
+        std::copy(buff, buff + m_ulSize, m_ptrDataHost);
+    }
+
+    static CTensor<T> LoadFromNumpy(const std::string &fname) {
+        auto f = cnpy::npy_load(fname);
+        CTensor<T> tn(f.shape);
+        tn.CopyHostDataFrom(f.data<T>());
+        return std::move(tn);
     }
 };

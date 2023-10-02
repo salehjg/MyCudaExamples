@@ -1,8 +1,8 @@
-set(target_name "VectorAddition")
-set(KERNEL_EXAMPLE1 1 CACHE STRING "Integer specifying the kernel version to be used in the compilation of example ${target_name}.")
+set(target_name "BasicOps")
+set(KERNEL_EXAMPLE2 1 CACHE STRING "Integer specifying the kernel version to be used in the compilation of example ${target_name}.")
 
 
-set(kernel_version ${KERNEL_EXAMPLE1})
+set(kernel_version ${KERNEL_EXAMPLE2})
 add_executable(${target_name}
         kernels/${kernel_version}/kernel.cu
         main.cpp
