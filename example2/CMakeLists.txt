@@ -1,5 +1,5 @@
 set(target_name "BasicOps")
-set(KERNEL_EXAMPLE2 1 CACHE STRING "Integer specifying the kernel version to be used in the compilation of example ${target_name}.")
+set(KERNEL_EXAMPLE2 2 CACHE STRING "Integer specifying the kernel version to be used in the compilation of example ${target_name}.")
 
 
 set(kernel_version ${KERNEL_EXAMPLE2})

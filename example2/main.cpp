@@ -24,7 +24,7 @@ CTensor<float> computeGold(const CTensor<float> &tnIn1, const CTensor<float> &tn
     return std::move(tnOut);
 }
 
-CTensor<size_t> GetSliceLengths(const std::vector<size_t> &shape) {
+std::vector<size_t> GetSliceLengths(const std::vector<size_t> &shape) {
     std::vector<size_t> lengths;
     for (int i = 0; i < shape.size(); i++) {
         size_t len = 1;
@@ -33,11 +33,7 @@ CTensor<size_t> GetSliceLengths(const std::vector<size_t> &shape) {
         }
         lengths.push_back(len);
     }
-    size_t len = lengths.size();
-    CTensor<size_t> lengthsDevice({len});
-    lengthsDevice.CopyHostDataFrom(lengths.data());
-    lengthsDevice.H2D();
-    return std::move(lengthsDevice);
+    return std::move(lengths);
 }
 
 void RunKernel(CTensor<float> &tnOut, const CTensor<float> &tn1, const CTensor<float> &tn2, BasicOperations op) {
@@ -64,7 +60,7 @@ void RunKernel(CTensor<float> &tnOut, const CTensor<float> &tn1, const CTensor<f
             tn2.GetRank(),
             tn1.GetSize(),
             itersPerThread,
-            sliceLengths.GetPtrDevice(), // we cannot do `sliceLengths.data()` as it is a host pointer, not a device one.
+            sliceLengths.data(), // we cannot do `sliceLengths.data()` as it is a host pointer, not a device one.
             op);
 }
 

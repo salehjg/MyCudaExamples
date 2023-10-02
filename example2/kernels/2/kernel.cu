@@ -7,9 +7,11 @@
 #include "common.h"
 #include "kernel.h"
 
+constexpr int UNROLLED_RANK1 = 5;
+__constant__ size_t sliceLensDevice[UNROLLED_RANK1];
+
 inline __device__ float PerformOperation(BasicOperations op, float in1, float in2) {
-    assert(op == BasicOperations::kAdd || op == BasicOperations::kSub || op == BasicOperations::kMul ||
-           op == BasicOperations::kDiv);
+    assert(op == BasicOperations::kAdd || op == BasicOperations::kSub || op == BasicOperations::kMul || op == BasicOperations::kDiv);
     return
             op == BasicOperations::kAdd ? in1 + in2 :
             op == BasicOperations::kSub ? in1 - in2 :
@@ -58,9 +60,9 @@ inline __device__ size_t ComputeAxisIndex(int axis, size_t idx, const size_t *sl
  */
 __global__
 void BasicOps(
-        const float *__restrict__ pIn1,
-        const float *__restrict__ pIn2,
-        float *__restrict__ pOut1,
+        const float * __restrict__ pIn1,
+        const float * __restrict__ pIn2,
+        float * __restrict__ pOut1,
         int rank1,
         int rank2,
         size_t sizeIn1,
@@ -72,8 +74,8 @@ void BasicOps(
     size_t idx, idxS2;
 
     //auto indices = new size_t[rank1];
-    assert(rank1 < 5);
-    size_t indices[5];
+    assert(rank1 < UNROLLED_RANK1);
+    size_t indices[UNROLLED_RANK1];
 
     for (size_t i = 0; i < iterPerThread; i++) {
         idx = tid * iterPerThread + i;
@@ -81,8 +83,11 @@ void BasicOps(
         // If iterPerThread>1, there might be an `idx` that is assigned to an element outside the tensor boundaries.
         if (idx >= sizeIn1) continue;
 
-        for (int axis = 0; axis < rank1; axis++) {
-            indices[axis] = ComputeAxisIndex(axis, idx, sliceLens, rank1);
+        #pragma unroll
+        for (int axis = 0; axis < UNROLLED_RANK1; axis++) {
+            if(axis<rank1){
+                indices[axis] = ComputeAxisIndex(axis, idx, sliceLens, rank1);
+            }
         }
 
         idxS2 = 0;
@@ -126,19 +131,18 @@ float LaunchBasicOps(
         int rank2,
         size_t sizeIn1,
         size_t iterPerThread,
-        const size_t *sliceLensHost,
+        const size_t *sliceLensHostData,
         BasicOperations op) {
 
     assert(rank2 <= rank1);
+    assert(rank1 < UNROLLED_RANK1);
 
-    size_t *sliceLensDevice;
-    CHECK(cudaMalloc((void **) &sliceLensDevice, rank1 * sizeof(size_t)));
-    CHECK(cudaMemcpy(sliceLensDevice, sliceLensHost, rank1 * sizeof(size_t), cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpyToSymbol(sliceLensDevice, sliceLensHostData, rank1*sizeof(size_t)));
 
-    auto t = TimeKernelMilliseconds([=]() {
-        BasicOps<<<grid, blockSize>>>(pIn1, pIn2, pOut1, rank1, rank2, sizeIn1, iterPerThread, sliceLensDevice, op);
+    size_t *sliceLensDeviceConstAddr;
+    CHECK(cudaGetSymbolAddress((void**)&sliceLensDeviceConstAddr, sliceLensDevice));
+
+    return TimeKernelMilliseconds([=]() {
+        BasicOps<<<grid, blockSize>>>(pIn1, pIn2, pOut1, rank1, rank2, sizeIn1, iterPerThread, sliceLensDeviceConstAddr, op);
     });
-
-    CHECK(cudaFree(sliceLensDevice));
-    return t;
 }
