@@ -42,7 +42,7 @@ void RunKernel(CTensor<float> &tnOut, const CTensor<float> &tn1, const CTensor<f
 
     int blockSize = 1024;
     int itersPerThread = std::ceil((float) tn1.GetSize() / (65535.0f * (float) blockSize));
-    size_t grid = (tn1.GetSize() - 1) / blockSize + 1;
+    size_t grid = (tn1.GetSize() - 1) / (blockSize * itersPerThread) + 1;
     auto sliceLengths = GetSliceLengths(tn1.GetShape());
 
     std::cout << "\tTensor Size: "<< tn1.GetSize() << std::endl;
