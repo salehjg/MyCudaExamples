@@ -7,6 +7,11 @@ check_language(CUDA)
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel Coverage.")
 set(CUDA_ARCHS "86" CACHE STRING "semi-colon seperated Compute Capability codes without dots, like 62;86")
 
+# Enforce C++17 for nvcc
+# Used in:
+#   example2/3
+set(CMAKE_CUDA_STANDARD 17)
+
 project(FaradarsCudaBasics LANGUAGES CUDA CXX)
 
 if(NOT DEFINED CMAKE_CUDA_STANDARD)
@@ -15,11 +20,12 @@ if(NOT DEFINED CMAKE_CUDA_STANDARD)
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "-g -G")  # -G enables device debugging (its a nvcc only flag)
+    set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "-g -G -O0")  # -G enables device debugging (its a nvcc only flag)
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-O3")
+    set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "-O3")
 endif()
 
 add_subdirectory(common)
