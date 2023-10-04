@@ -12,6 +12,7 @@
 
 #include "common.h"
 #include "CRandFiller.h"
+#include "cnpy.h"
 
 enum class FillTypes {
     kRandom,
