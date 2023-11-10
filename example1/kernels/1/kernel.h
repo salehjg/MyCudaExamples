@@ -1,9 +1,3 @@
-//
-// Created by saleh on 9/17/23.
-//
-
 #pragma once
 
-#include <iostream>
-
-extern float LaunchVecAdd(unsigned blockSize, size_t len, const float *i1, const float *i2, float *i3);
+extern float LaunchVecAdd(unsigned blockSize, size_t len, const float *pIn1, const float *pIn2, float *pOut1);

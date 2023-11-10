@@ -11,16 +11,12 @@ set(CUDA_ARCHS "86" CACHE STRING "semi-colon seperated Compute Capability codes 
 # Used in:
 #   example2/3
 set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 project(FaradarsCudaBasics LANGUAGES CUDA CXX)
 
-if(NOT DEFINED CMAKE_CUDA_STANDARD)
-    set(CMAKE_CUDA_STANDARD 11)
-    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-endif()
-
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "-g -G -O0")  # -G enables device debugging (its a nvcc only flag)
+    set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "-g -G -O0 -Xptxas=\"-v\"")  # -G enables device debugging (its a nvcc only flag)
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
