@@ -8,8 +8,6 @@ set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the type of build, options are: 
 set(CUDA_ARCHS "86" CACHE STRING "semi-colon seperated Compute Capability codes without dots, like 62;86")
 
 # Enforce C++17 for nvcc
-# Used in:
-#   example2/3
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
