@@ -70,14 +70,14 @@ void BasicOps(
         const size_t *sliceLens,
         BasicOperations op) {
 
-    size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t gid = blockIdx.x * blockDim.x + threadIdx.x;
     size_t idx, idxS2;
 
     assert(rank1 < UNROLLED_RANK1);
     size_t indices[UNROLLED_RANK1];
 
     for (size_t i = 0; i < iterPerThread; i++) {
-        idx = tid * iterPerThread + i;
+        idx = gid * iterPerThread + i;
 
         // If iterPerThread>1, there might be an `idx` that is assigned to an element outside the tensor boundaries.
         if (idx >= sizeIn1) continue;

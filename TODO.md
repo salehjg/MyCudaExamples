@@ -1,0 +1,2 @@
+- [x] Fix `example2/4`: Output mismatch.
+- [ ] Fix `example2/*`: `SliceLen`'s host data + device alloc. 

@@ -8,7 +8,6 @@
 #include "kernel.h"
 
 constexpr int UNROLLED_RANK1 = 5;
-__constant__ size_t sliceLensDevice[UNROLLED_RANK1];
 
 inline __device__ float PerformOperation(BasicOperations op, float in1, float in2) {
     assert(op == BasicOperations::kAdd || op == BasicOperations::kSub || op == BasicOperations::kMul || op == BasicOperations::kDiv);
@@ -60,20 +59,30 @@ void BasicOps(
         const float * __restrict__ pIn1,
         const float * __restrict__ pIn2,
         float * __restrict__ pOut1,
+        const size_t * __restrict__ pSliceLen,
         int rank1,
         int rank2,
         size_t sizeIn1,
         size_t iterPerThread,
         BasicOperations op) {
 
-    size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t gid = blockIdx.x * blockDim.x + threadIdx.x;
     size_t idx, idxS2;
+    __shared__ size_t sliceLenShared[UNROLLED_RANK1];
+
+    for (int n=0; n<UNROLLED_RANK1/blockDim.x+1; n++) {
+        size_t sliceArrayIndex = n*blockDim.x + threadIdx.x; // don't use `gid` instead of `threadIdx.x`.
+
+        if (sliceArrayIndex<rank1){
+            sliceLenShared[sliceArrayIndex] = pSliceLen[sliceArrayIndex];
+        }
+    }
 
     assert(rank1 < UNROLLED_RANK1);
     size_t indices[UNROLLED_RANK1];
 
     for (size_t i = 0; i < iterPerThread; i++) {
-        idx = tid * iterPerThread + i;
+        idx = gid * iterPerThread + i;
 
         // If iterPerThread>1, there might be an `idx` that is assigned to an element outside the tensor boundaries.
         if (idx >= sizeIn1) continue;
@@ -81,13 +90,14 @@ void BasicOps(
         #pragma unroll
         for (int axis = 0; axis < UNROLLED_RANK1; axis++) {
             if(axis<rank1){
-                indices[axis] = ComputeAxisIndex(axis, idx, sliceLensDevice, rank1);
+                indices[axis] = ComputeAxisIndex(axis, idx, sliceLenShared, rank1);
+                //printf("indices[%d]=%lu\n", axis, indices[axis]);
             }
         }
 
         idxS2 = 0;
         for (int axis = rank1 - rank2; axis < rank1; axis++) {
-            idxS2 += indices[axis] * sliceLensDevice[axis];
+            idxS2 += indices[axis] * sliceLenShared[axis];
         }
         pOut1[idx] = PerformOperation(op, pIn1[idx], pIn2[idxS2]);
     }
@@ -127,9 +137,13 @@ float LaunchBasicOps(
     assert(rank2 <= rank1);
     assert(rank1 < UNROLLED_RANK1);
 
-    CHECK(cudaMemcpyToSymbol(sliceLensDevice, sliceLensHostData, rank1*sizeof(size_t)));
+    size_t *sliceLensDevice;
+    CHECK(cudaMalloc((void **) &sliceLensDevice, UNROLLED_RANK1*sizeof(size_t)));
+    CHECK(cudaMemcpy(sliceLensDevice, sliceLensHostData, UNROLLED_RANK1*sizeof(size_t), cudaMemcpyHostToDevice));
 
     return TimeKernelMilliseconds([=]() {
-        BasicOps<<<grid, blockSize>>>(pIn1, pIn2, pOut1, rank1, rank2, sizeIn1, iterPerThread, op);
+        BasicOps<<<grid, blockSize>>>(pIn1, pIn2, pOut1, sliceLensDevice, rank1, rank2, sizeIn1, iterPerThread, op);
     });
+
+    CHECK(cudaFree(sliceLensDevice));
 }
