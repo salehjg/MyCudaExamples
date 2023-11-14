@@ -5,6 +5,8 @@
 #include <cassert>
 #include <iostream>
 #include <cmath>
+#include <sstream>
+#include <charconv>
 
 #include "cnpy.h"
 #include "kernel.h"
@@ -36,7 +38,7 @@ std::vector<size_t> GetSliceLengths(const std::vector<size_t> &shape) {
     return std::move(lengths);
 }
 
-void RunKernel(CTensor<float> &tnOut, const CTensor<float> &tn1, const CTensor<float> &tn2, BasicOperations op) {
+float RunKernel(CTensor<float> &tnOut, const CTensor<float> &tn1, const CTensor<float> &tn2, BasicOperations op) {
     // For CUDA, max threads per block is 1024 (even for 3D blocks).
     // Maximum number of blocks is 65535 for each axis of 1D, 2D, or 3D grid.
 
@@ -50,7 +52,7 @@ void RunKernel(CTensor<float> &tnOut, const CTensor<float> &tn1, const CTensor<f
     std::cout << "\tGrid: "<< grid << std::endl;
     std::cout << "\tIters Per Thread: "<< itersPerThread << std::endl;
     std::cout << "\t";
-    LaunchBasicOps(
+    return LaunchBasicOps(
             grid,
             blockSize,
             tn1.GetPtrDevice(),
@@ -65,14 +67,19 @@ void RunKernel(CTensor<float> &tnOut, const CTensor<float> &tn1, const CTensor<f
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
+    if (argc != 3) {
         std::cout << "Use this executable as below:" << std::endl;
-        std::cout << TARGETNAME << " gold_dir_path" << std::endl;
+        std::cout << TARGETNAME << " gold_dir_path <FirstTestOnly>" << std::endl;
+        std::cout << "FirstTestOnly: 0: off, val>0: repeat `val` time." << std::endl;
         return 1;
     }
 
     const std::string goldDir(argv[1]); // not going to bother using boost or std.
     const std::string exampleGoldDir = goldDir + "/example2/"; // not going to bother using boost or std.
+    const std::string repeatStr(argv[2]);
+    int repeat;
+    auto [ptr, ec] = std::from_chars(repeatStr.data(), repeatStr.data()+repeatStr.size(), repeat);
+    assert(ec == std::errc{});
 
     PrintHeader();
     constexpr auto baseDir = "";
@@ -101,17 +108,33 @@ int main(int argc, char *argv[]) {
     auto tn1 = CTensor<float>::LoadFromNumpy(exampleGoldDir + "tn1.npy");
     tn1.H2D();
 
+    int counter = 0;
     for (auto &testCase: testCases) {
+        if (repeat>0 && counter>=1) continue;
+
         auto tn2 = CTensor<float>::LoadFromNumpy(exampleGoldDir + std::get<0>(testCase));
         tn2.H2D();
         auto tnGold = CTensor<float>::LoadFromNumpy(exampleGoldDir + std::get<1>(testCase));
         auto tnUut = CTensor<float>(tn1.GetShape());
 
         std::cout << "Test Case: " << std::endl;
-        RunKernel(tnUut, tn1, tn2, std::get<2>(testCase));
+        if (repeat>0) {
+            float totalRuntime = 0;
+            for (int r = 0; r < repeat; r++) {
+                totalRuntime += RunKernel(tnUut, tn1, tn2, std::get<2>(testCase));
+            }
+            std::cout << "\tAverage Device Time ("<< repeat <<" reps): " << totalRuntime/(float)repeat << std::endl;
+        } else {
+            RunKernel(tnUut, tn1, tn2, std::get<2>(testCase));
+        }
+
+
+
+
         tnUut.D2H();
         std::cout << "\tTn1: " << std::get<0>(testCase) << std::endl;
         std::cout << "\tTn2: " << std::get<1>(testCase) << std::endl;
         std::cout << "\tMatched: " << tnUut.CompareHostData(tnGold, MAX_ERR_FLOAT) << std::endl;
+        counter++;
     }
 }

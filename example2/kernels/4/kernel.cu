@@ -7,40 +7,72 @@
 #include "common.h"
 #include "kernel.h"
 
-constexpr int UNROLLED_RANK1 = 5;
+constexpr int UNROLLED_RANK1 = 4;
+constexpr int SMEM_PADDING = 1; // to avoid smem bank conflict
+__constant__ size_t sliceLensDevice[UNROLLED_RANK1];
 
-inline __device__ float PerformOperation(BasicOperations op, float in1, float in2) {
-    assert(op == BasicOperations::kAdd || op == BasicOperations::kSub || op == BasicOperations::kMul || op == BasicOperations::kDiv);
-    return
-            op == BasicOperations::kAdd ? in1 + in2 :
-            op == BasicOperations::kSub ? in1 - in2 :
-            op == BasicOperations::kMul ? in1 * in2 :
-            op == BasicOperations::kDiv ? in1 / in2 :
-            0;
+template<BasicOperations op>
+inline __device__ float PerformOperation(float in1, float in2) {}
+
+template<>
+inline __device__ float PerformOperation<BasicOperations::kAdd>(float in1, float in2) {
+    return in1 + in2;
+}
+
+template<>
+inline __device__ float PerformOperation<BasicOperations::kSub>(float in1, float in2) {
+    return in1 - in2;
+}
+
+template<>
+inline __device__ float PerformOperation<BasicOperations::kMul>(float in1, float in2) {
+    return in1 * in2;
+}
+
+template<>
+inline __device__ float PerformOperation<BasicOperations::kDiv>(float in1, float in2) {
+    return in1 / in2;
 }
 
 /**
  * @brief Computes the dimension index for the given axis.
  *
- * @param axis The axis for which the dimension index should be computed.
  * @param idx The assigned flat index for the current thread.
  * @param sliceLens An array of
  *                  {(shape1[1] * shape1[2] * shape1[3]), (shape1[2] * shape1[3]), (shape1[3]), 1}
  *                  for a tensor of rank 4 for example.
- * @param rank1 The rank of the input tensor 1.
  * @return
  */
-inline __device__ size_t ComputeAxisIndex(int axis, size_t idx, const size_t *sliceLens, int rank1) {
+
+template<int rank1, int axis>
+inline __device__ size_t ComputeAxisIndex(size_t idx, const size_t *sliceLens, size_t *indices) {
     // assert() only works in the main kernel function (tagged with `__global__`).
     // here, since our `__device__` function is inline, we can use assert() without problems.
-    assert(axis < rank1);
+    static_assert(axis < rank1);
 
-    if (axis == 0) {
-        return idx / sliceLens[axis];
+    if constexpr (axis == 0) {
+        indices[threadIdx.x*(rank1+SMEM_PADDING) + axis] = idx / sliceLens[axis];
     } else {
-        return (idx % sliceLens[axis - 1]) / sliceLens[axis];
+        indices[threadIdx.x*(rank1+SMEM_PADDING) + axis] = (idx % sliceLens[axis - 1]) / sliceLens[axis];
     }
 }
+
+
+template<int start, int end, typename F, typename... Args>
+void __device__ CompileTimeFor(F f, size_t idx, const size_t *sliceLens, size_t *indices) {
+    if constexpr (start < end) {
+        f.template operator()<start>(idx, sliceLens, indices);
+        CompileTimeFor<start + 1, end>(f, idx, sliceLens, indices);
+    }
+}
+
+template<int rank1>
+struct ComputeAxisIndexWrapper {
+    template<int I>
+    inline __device__ size_t operator()(size_t idx, const size_t *sliceLens, size_t *indices) {
+        return ComputeAxisIndex<rank1, I>(idx, sliceLens, indices);
+    }
+};
 
 /**
  * @brief Element-wise Basic Operations' Kernel. Could accept input tensor 1 of any rank.
@@ -48,58 +80,38 @@ inline __device__ size_t ComputeAxisIndex(int axis, size_t idx, const size_t *sl
  * @param pIn1 The input tensor 1.
  * @param pIn2 The input tensor 2.
  * @param pOut1 The output tensor.
- * @param rank1 The rank of the input tensor 1.
  * @param rank2 The rank of the input tensor 2. It should be equal or less that rank1.
  * @param sizeIn1 The size of the input tensor 1.
- * @param iterPerThread Number of output tensor's elements assigned per thread.
- * @param op The element-wise operation that is to be done.
+ * @param sliceLens An array of length `rank1` containing
+ *                  {(shape1[1] * shape1[2] * shape1[3]), (shape1[2] * shape1[3]), (shape1[3]), 1}
+ *                  for a tensor of rank 4 for example.
  */
-__global__
-void BasicOps(
-        const float * __restrict__ pIn1,
-        const float * __restrict__ pIn2,
-        float * __restrict__ pOut1,
-        const size_t * __restrict__ pSliceLen,
-        int rank1,
-        int rank2,
+template<size_t iterPerThread, int rank1, int rank2, BasicOperations op>
+__global__ void BasicOps(
+        const float *__restrict__ pIn1,
+        const float *__restrict__ pIn2,
+        float *__restrict__ pOut1,
         size_t sizeIn1,
-        size_t iterPerThread,
-        BasicOperations op) {
+        const size_t *sliceLens) {
 
-    size_t gid = blockIdx.x * blockDim.x + threadIdx.x;
     size_t idx, idxS2;
-    __shared__ size_t sliceLenShared[UNROLLED_RANK1];
+    extern __shared__ size_t indices[];
 
-    for (int n=0; n<UNROLLED_RANK1/blockDim.x+1; n++) {
-        size_t sliceArrayIndex = n*blockDim.x + threadIdx.x; // don't use `gid` instead of `threadIdx.x`.
-
-        if (sliceArrayIndex<rank1){
-            sliceLenShared[sliceArrayIndex] = pSliceLen[sliceArrayIndex];
-        }
-    }
-
-    assert(rank1 < UNROLLED_RANK1);
-    size_t indices[UNROLLED_RANK1];
-
+#pragma unroll
     for (size_t i = 0; i < iterPerThread; i++) {
-        idx = gid * iterPerThread + i;
+        idx = (blockIdx.x * blockDim.x + threadIdx.x) * iterPerThread + i;
 
         // If iterPerThread>1, there might be an `idx` that is assigned to an element outside the tensor boundaries.
         if (idx >= sizeIn1) continue;
 
-        #pragma unroll
-        for (int axis = 0; axis < UNROLLED_RANK1; axis++) {
-            if(axis<rank1){
-                indices[axis] = ComputeAxisIndex(axis, idx, sliceLenShared, rank1);
-                //printf("indices[%d]=%lu\n", axis, indices[axis]);
-            }
-        }
+        CompileTimeFor<0, rank1>(ComputeAxisIndexWrapper<rank1>(), idx, sliceLens, indices);
 
         idxS2 = 0;
+#pragma unroll
         for (int axis = rank1 - rank2; axis < rank1; axis++) {
-            idxS2 += indices[axis] * sliceLenShared[axis];
+            idxS2 += indices[threadIdx.x*(rank1+SMEM_PADDING) + axis] * sliceLens[axis];
         }
-        pOut1[idx] = PerformOperation(op, pIn1[idx], pIn2[idxS2]);
+        pOut1[idx] = PerformOperation<op>(pIn1[idx], pIn2[idxS2]);
     }
 }
 
@@ -115,7 +127,7 @@ void BasicOps(
  * @param rank2 The rank of the input tensor 2. It should be equal or less that rank1.
  * @param sizeIn1 The size of the input tensor 1.
  * @param iterPerThread Number of output tensor's elements assigned per thread.
- * @param sliceLensHostData An array of length `rank1` containing
+ * @param sliceLens An array of length `rank1` containing
  *                  {(shape1[1] * shape1[2] * shape1[3]), (shape1[2] * shape1[3]), (shape1[3]), 1}
  *                  for a tensor of rank 4 for example.
  * @param op The element-wise operation that is to be done.
@@ -137,13 +149,67 @@ float LaunchBasicOps(
     assert(rank2 <= rank1);
     assert(rank1 < UNROLLED_RANK1);
 
-    size_t *sliceLensDevice;
-    CHECK(cudaMalloc((void **) &sliceLensDevice, UNROLLED_RANK1*sizeof(size_t)));
-    CHECK(cudaMemcpy(sliceLensDevice, sliceLensHostData, UNROLLED_RANK1*sizeof(size_t), cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpyToSymbol(sliceLensDevice, sliceLensHostData, rank1 * sizeof(size_t)));
+
+    size_t *sliceLensDeviceConstAddr;
+    CHECK(cudaGetSymbolAddress((void **) &sliceLensDeviceConstAddr, sliceLensDevice));
+
+    size_t smemSize = (rank1+SMEM_PADDING)*blockSize*sizeof(size_t);
 
     return TimeKernelMilliseconds([=]() {
-        BasicOps<<<grid, blockSize>>>(pIn1, pIn2, pOut1, sliceLensDevice, rank1, rank2, sizeIn1, iterPerThread, op);
-    });
+        if (iterPerThread == 1 and rank1 == 4 and rank2 == 4 and op == BasicOperations::kAdd) {
+            BasicOps<1, 4, 4, BasicOperations::kAdd><<<grid, blockSize, smemSize>>>(pIn1, pIn2, pOut1, sizeIn1, sliceLensDeviceConstAddr);
+        }
+        if (iterPerThread == 1 and rank1 == 4 and rank2 == 4 and op == BasicOperations::kSub) {
+            BasicOps<1, 4, 4, BasicOperations::kSub><<<grid, blockSize, smemSize>>>(pIn1, pIn2, pOut1, sizeIn1, sliceLensDeviceConstAddr);
+        }
+        if (iterPerThread == 1 and rank1 == 4 and rank2 == 4 and op == BasicOperations::kMul) {
+            BasicOps<1, 4, 4, BasicOperations::kMul><<<grid, blockSize, smemSize>>>(pIn1, pIn2, pOut1, sizeIn1, sliceLensDeviceConstAddr);
+        }
+        if (iterPerThread == 1 and rank1 == 4 and rank2 == 4 and op == BasicOperations::kDiv) {
+            BasicOps<1, 4, 4, BasicOperations::kDiv><<<grid, blockSize, smemSize>>>(pIn1, pIn2, pOut1, sizeIn1, sliceLensDeviceConstAddr);
+        }
 
-    CHECK(cudaFree(sliceLensDevice));
+
+        if (iterPerThread == 1 and rank1 == 4 and rank2 == 3 and op == BasicOperations::kAdd) {
+            BasicOps<1, 4, 3, BasicOperations::kAdd><<<grid, blockSize, smemSize>>>(pIn1, pIn2, pOut1, sizeIn1, sliceLensDeviceConstAddr);
+        }
+        if (iterPerThread == 1 and rank1 == 4 and rank2 == 3 and op == BasicOperations::kSub) {
+            BasicOps<1, 4, 3, BasicOperations::kSub><<<grid, blockSize, smemSize>>>(pIn1, pIn2, pOut1, sizeIn1, sliceLensDeviceConstAddr);
+        }
+        if (iterPerThread == 1 and rank1 == 4 and rank2 == 3 and op == BasicOperations::kMul) {
+            BasicOps<1, 4, 3, BasicOperations::kMul><<<grid, blockSize, smemSize>>>(pIn1, pIn2, pOut1, sizeIn1, sliceLensDeviceConstAddr);
+        }
+        if (iterPerThread == 1 and rank1 == 4 and rank2 == 3 and op == BasicOperations::kDiv) {
+            BasicOps<1, 4, 3, BasicOperations::kDiv><<<grid, blockSize, smemSize>>>(pIn1, pIn2, pOut1, sizeIn1, sliceLensDeviceConstAddr);
+        }
+
+
+        if (iterPerThread == 1 and rank1 == 4 and rank2 == 2 and op == BasicOperations::kAdd) {
+            BasicOps<1, 4, 2, BasicOperations::kAdd><<<grid, blockSize, smemSize>>>(pIn1, pIn2, pOut1, sizeIn1, sliceLensDeviceConstAddr);
+        }
+        if (iterPerThread == 1 and rank1 == 4 and rank2 == 2 and op == BasicOperations::kSub) {
+            BasicOps<1, 4, 2, BasicOperations::kSub><<<grid, blockSize, smemSize>>>(pIn1, pIn2, pOut1, sizeIn1, sliceLensDeviceConstAddr);
+        }
+        if (iterPerThread == 1 and rank1 == 4 and rank2 == 2 and op == BasicOperations::kMul) {
+            BasicOps<1, 4, 2, BasicOperations::kMul><<<grid, blockSize, smemSize>>>(pIn1, pIn2, pOut1, sizeIn1, sliceLensDeviceConstAddr);
+        }
+        if (iterPerThread == 1 and rank1 == 4 and rank2 == 2 and op == BasicOperations::kDiv) {
+            BasicOps<1, 4, 2, BasicOperations::kDiv><<<grid, blockSize, smemSize>>>(pIn1, pIn2, pOut1, sizeIn1, sliceLensDeviceConstAddr);
+        }
+
+
+        if (iterPerThread == 1 and rank1 == 4 and rank2 == 1 and op == BasicOperations::kAdd) {
+            BasicOps<1, 4, 1, BasicOperations::kAdd><<<grid, blockSize, smemSize>>>(pIn1, pIn2, pOut1, sizeIn1, sliceLensDeviceConstAddr);
+        }
+        if (iterPerThread == 1 and rank1 == 4 and rank2 == 1 and op == BasicOperations::kSub) {
+            BasicOps<1, 4, 1, BasicOperations::kSub><<<grid, blockSize, smemSize>>>(pIn1, pIn2, pOut1, sizeIn1, sliceLensDeviceConstAddr);
+        }
+        if (iterPerThread == 1 and rank1 == 4 and rank2 == 1 and op == BasicOperations::kMul) {
+            BasicOps<1, 4, 1, BasicOperations::kMul><<<grid, blockSize, smemSize>>>(pIn1, pIn2, pOut1, sizeIn1, sliceLensDeviceConstAddr);
+        }
+        if (iterPerThread == 1 and rank1 == 4 and rank2 == 1 and op == BasicOperations::kDiv) {
+            BasicOps<1, 4, 1, BasicOperations::kDiv><<<grid, blockSize, smemSize>>>(pIn1, pIn2, pOut1, sizeIn1, sliceLensDeviceConstAddr);
+        }
+    });
 }

@@ -19,7 +19,7 @@ endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} "-O3")
-    set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "-O3")
+    set(CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "-O3 -Xptxas=\"-v\"")
 endif()
 
 add_subdirectory(common)
