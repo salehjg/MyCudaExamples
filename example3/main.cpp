@@ -11,10 +11,17 @@ template<typename T>
 CTensor<T> ComputeGoldR1A0(CTensor<T> &tn1) {
     assert(tn1.GetRank() == 1);
     CTensor<float> tnOut({1});
-    tnOut[0] = 0;
+
+    double sum = 0; // for large partial sums, `float` will not be adequate.
     for (size_t idx = 0; idx < tn1.GetSize(); idx++) {
-        tnOut[0] += tn1[idx];
+        if (tn1[idx] != 1.0f) {
+            int a = 1;
+            a++;
+        }
+        sum += tn1[idx];
     }
+    tnOut[0] = (float)sum;
+
     return std::move(tnOut);;
 }
 
@@ -28,7 +35,10 @@ void FillPadRangeWithZero(size_t wordCount, CTensor<T> &tn1) {
     for (size_t i = wordCount; i < tn1.GetSize(); i++) {
         tn1[i] = 0;
     }
-    if (wordCount != tn1.GetSize()) tn1.H2D();
+    if (wordCount != tn1.GetSize()) {
+        tn1.H2D();
+    }
+
 }
 
 int main(int argc, char *argv[]) {
@@ -43,7 +53,7 @@ int main(int argc, char *argv[]) {
     const unsigned BLOCKSIZE = 512;
     unsigned LEN;
     const std::string lenStr(argv[1]);
-    auto [ptr, ec] = std::from_chars(lenStr.data(), lenStr.data()+lenStr.size(), LEN);
+    auto [ptr, ec] = std::from_chars(lenStr.data(), lenStr.data() + lenStr.size(), LEN);
     assert(ec == std::errc{});
 
     assert((BLOCKSIZE > 0 && ((BLOCKSIZE & (BLOCKSIZE - 1)) == 0))); // Check to make sure BLOCKSIZE is a power of 2.
@@ -56,10 +66,14 @@ int main(int argc, char *argv[]) {
 
     auto tnGold = ComputeGoldR1A0(tn1);
 
-    LaunchReductionR1A0(256, tn1.GetSize(), tn1.GetPtrDevice(), tn2.GetPtrDevice());
+    LaunchReductionR1A0(BLOCKSIZE, tn1.GetSize(), tn1.GetPtrDevice(), tn2.GetPtrDevice());
 
     tn2.D2H();
     std::cout << "Padded Sample Size (MB): " << (float) tn1.GetSizeBytes() / 1024.0f / 1024.0f << std::endl;
     std::cout << "Padded Words: " << tn1.GetSize() - LEN << std::endl;
-    std::cout << "Gold - UUT: " << tnGold[0] - tn2[0] << std::endl;
+    std::cout << "Gold: " << tnGold[0] << std::endl;
+    std::cout << "UUT: " << tn2[0] << std::endl;
+    float v1 = tnGold[0];
+    float v2 = tn2[0];
+    std::cout << "Gold - UUT: " << v1 - v2 << std::endl;
 }

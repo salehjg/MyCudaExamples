@@ -4,6 +4,10 @@ __global__
 void ReductionR1A0(size_t len, const float *pIn1, float *pOut1) {
     const auto tid = threadIdx.x;
     const auto gid = blockIdx.x * blockDim.x + tid;
+    if (gid == 0){
+        pOut1[0] = 0;
+    }
+    __threadfence();
     atomicAdd(&pOut1[0], pIn1[gid]);
 }
 
