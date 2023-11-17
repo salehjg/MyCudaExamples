@@ -58,6 +58,8 @@ __global__ void ReductionR1A0(size_t len, const float *__restrict__ pIn1, float 
     // Phase 3. Accumulate the partial sum of this block with the rest.
     if (tid == 0) {
         atomicAdd(pOut1, smem[0]);
+        // This is bad. For large samples, there will be huge amount of operations forcibly serialized by the atomic operation above across the grid.
+        // It affects the final latency of the whole kernel, see [Thread Fence Reduction](https://github.com/NVIDIA/cuda-samples/blob/master/Samples/2_Concepts_and_Techniques/threadFenceReduction/threadFenceReduction_kernel.cuh).
     }
 
 }
