@@ -7,6 +7,7 @@
 
 #include "kernel.h"
 
+
 template<typename T>
 CTensor<T> ComputeGoldR1A0(CTensor<T> &tn1) {
     assert(tn1.GetRank() == 1);
@@ -25,9 +26,9 @@ CTensor<T> ComputeGoldR1A0(CTensor<T> &tn1) {
     return std::move(tnOut);;
 }
 
-size_t GetPaddedLen(unsigned blockSize, size_t wordCount) {
+size_t GetPaddedLen(unsigned blockSize, size_t wordCount, unsigned slicesPerBlock=fixedSlicesPerBlock) {
     assert(wordCount > 0);
-    return ((wordCount - 1) / blockSize + 1) * blockSize;
+    return ((wordCount - 1) / (slicesPerBlock*blockSize) + 1) * blockSize*slicesPerBlock;
 }
 
 template<typename T>
@@ -50,7 +51,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    const unsigned BLOCKSIZE = 512;
+    constexpr unsigned BLOCKSIZE = 512;
     unsigned LEN;
     const std::string lenStr(argv[1]);
     auto [ptr, ec] = std::from_chars(lenStr.data(), lenStr.data() + lenStr.size(), LEN);

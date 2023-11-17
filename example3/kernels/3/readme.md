@@ -1,7 +1,7 @@
 # Details
-**Base Kernel**: -
+**Base Kernel**: 2
 
-Implements Tree Reduction with the interleaved mapping.
+Implements Tree Reduction with the sequential mapping.
 
 
 ## Modifications
@@ -13,6 +13,6 @@ Per device results are listed below.
 ## Device `RXT3060-12G`
 - **Args**: `67108864`
 - **NVCC Opts**: `-O3`
-- **Device Time (ms)**: 3.3807
+- **Device Time (ms)**: 3.19728
 
 
