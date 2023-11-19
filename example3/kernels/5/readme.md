@@ -2,7 +2,7 @@
 **Base Kernel**: 4
 
 ## Notes:
-- The kernel be optimized further by using Wrap Shuffle instructions in the path for `0<=tid<32`. 
+- The kernel could be optimized further using [wrap-level primitives](https://developer.nvidia.com/blog/using-cuda-warp-level-primitives/) in the path for `0<=tid<32`. 
 - Replacing atomic instructions with nested kernel launches.
 - Using [Thread Fence Reduction](https://github.com/NVIDIA/cuda-samples/blob/master/Samples/2_Concepts_and_Techniques/threadFenceReduction/threadFenceReduction_kernel.cuh).
 
