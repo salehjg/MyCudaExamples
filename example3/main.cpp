@@ -65,6 +65,12 @@ int main(int argc, char *argv[]) {
     tn1.Fill(&randFiller, FillTypes::kConstant1);
     FillPadRangeWithZero(LEN, tn1);
 
+    // Init the output tensor (tn2)
+    // This:
+    tn2[0] = 0; tn2.H2D();
+    //Or
+    //CHECK(cudaMemset(tn2.GetPtrDevice(), 0, tn2.GetSizeBytes()));
+
     auto tnGold = ComputeGoldR1A0(tn1);
 
     LaunchReductionR1A0(BLOCKSIZE, tn1.GetSize(), tn1.GetPtrDevice(), tn2.GetPtrDevice());

@@ -14,14 +14,6 @@ void ReductionR1A0(size_t len, const float * __restrict__ pIn1, float * __restri
     const size_t tid = threadIdx.x;
     const size_t gid = blockIdx.x * blockDim.x + tid;
 
-    // Phase 0. Init the output tensor
-    // Comment out this phase and test the kernel with
-    // `sudo compute-sanitizer --tool initcheck ./ReductionR1A0 12345`.
-    if (gid == 0){
-        pOut1[0] = 0;
-    }
-
-
     // Phase 1. Copy the assigned chunk to the shared memory.
     smem[tid] = pIn1[gid];
     __syncthreads();
