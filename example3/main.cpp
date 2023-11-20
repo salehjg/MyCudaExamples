@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
 
     assert((BLOCKSIZE > 0 && ((BLOCKSIZE & (BLOCKSIZE - 1)) == 0))); // Check to make sure BLOCKSIZE is a power of 2.
     CTensor<float> tn1({GetPaddedLen(BLOCKSIZE, LEN)}), tn2({1});
-    CRandFiller<float> randFiller(-1000000.0f, +100000.0f);
+    CRandFiller<float> randFiller(-10.0f, +10.0f);
 
     // Do not use FillTypes::kIncr for large samples, it will overflow.
     tn1.Fill(&randFiller, FillTypes::kConstant1);

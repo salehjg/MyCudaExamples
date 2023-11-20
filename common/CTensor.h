@@ -19,6 +19,7 @@ enum class FillTypes {
     kIncr,
     kDecr,
     kCustom1,
+    kConstant0,
     kConstant1,
 };
 
@@ -161,6 +162,10 @@ public:
             }
             case FillTypes::kCustom1: {
                 for (size_t i = 0; i < m_ulSize; i++) { m_ptrDataHost[i] = (T) (i % 10); }
+                break;
+            }
+            case FillTypes::kConstant0: {
+                for (size_t i = 0; i < m_ulSize; i++) { m_ptrDataHost[i] = 0; }
                 break;
             }
             case FillTypes::kConstant1: {
