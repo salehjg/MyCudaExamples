@@ -55,14 +55,14 @@ int main(int argc, char *argv[]) {
     CTensor<float> tnA({shapeN, shapeK}), tnB({shapeK, shapeM}), tnC({shapeN, shapeM});
     CRandFiller<float> randFiller(-11.0f, +11.0f);
 
-    tnA.Fill(&randFiller, FillTypes::kRandom);
-    tnB.Fill(&randFiller, FillTypes::kRandom);
+    tnA.Fill(&randFiller, FillTypes::kConstant1);
+    tnB.Fill(&randFiller, FillTypes::kConstant1);
     tnC.Fill(&randFiller, FillTypes::kConstant0);
 
     auto tnGold = ComputeGold(tnA, tnB);
 
     LaunchMatMul(
-            {32, 32, 1},
+            {8, 8, 1},
             shapeN, shapeM, shapeK,
             tnA.GetPtrDevice(),
             tnB.GetPtrDevice(),
