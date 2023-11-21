@@ -38,7 +38,7 @@ void MatMul(
     unsigned kReps = shapeK / tileDepth;
     assert(shapeK >= tileDepth); // shapeK cannot be less than tileDepth!
 
-    volatile float sum = 0;
+    float sum = 0;
     for (unsigned kTile = 0; kTile < kReps; kTile++) {
         for (unsigned equivalentTidX = threadIdx.x; equivalentTidX < tileDepth; equivalentTidX += blockSize) {
             // Our blocks are `blockSize (height) * blockSize (width)` but we are trying to copy a tile of
