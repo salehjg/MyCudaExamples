@@ -14,6 +14,6 @@ Per device results are listed below.
 ## Device `RXT3060-12G`
 - **Args**: `1024 1024 1024`
 - **NVCC Opts**: `-O3`
-- **Device Time (ms)**: 8.27565
+- **Device Time (ms)**: 2.69258
 
 

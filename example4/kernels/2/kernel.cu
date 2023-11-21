@@ -40,7 +40,6 @@ void MatMul(
 
     volatile float sum = 0;
     for (unsigned kTile = 0; kTile < kReps; kTile++) {
-
         for (unsigned equivalentTidX = threadIdx.x; equivalentTidX < tileDepth; equivalentTidX += blockSize) {
             // Our blocks are `blockSize (height) * blockSize (width)` but we are trying to copy a tile of
             // global memory of size `blockSize * tileDepth`. So we need a block-stride loop for x-axis to extend it
@@ -49,48 +48,31 @@ void MatMul(
                 unsigned xA = kTile * tileDepth + equivalentTidX;
                 unsigned yA = gid_j;
                 if (xA < shapeK && yA < shapeN) {
-                    auto tmp = pInA[yA * shapeK + xA];
-                    tileA[threadIdx.y * tileDepth + equivalentTidX] = tmp;
+                    tileA[threadIdx.y * tileDepth + equivalentTidX] = pInA[yA * shapeK + xA];
                 } else {
-                    printf("out of bound A\n");
                     tileA[threadIdx.y * tileDepth + equivalentTidX] = 0;
                 }
             }
         }
-        __syncthreads();
-
         for (unsigned equivalentTidY = threadIdx.y; equivalentTidY < tileDepth; equivalentTidY += blockSize) {
             if (equivalentTidY < tileDepth) {
                 unsigned xB = gid_i;
                 unsigned yB = kTile * tileDepth + equivalentTidY;
                 if (xB < shapeM && yB < shapeK) {
-                    auto tmp = pInB[yB * blockSize + xB];
-                    tileB[equivalentTidY * blockSize + threadIdx.x] = tmp;
+                    tileB[equivalentTidY * blockSize + threadIdx.x] = pInB[yB * blockSize + xB];
                 } else {
-                    printf("out of bound B\n");
                     tileB[equivalentTidY * blockSize + threadIdx.x] = 0;
                 }
             }
         }
         __syncthreads();
 
+#pragma unroll
         for (unsigned k = 0; k < tileDepth; k++) {
-            auto tmp1 = tileA[threadIdx.y * tileDepth + k];
-            auto tmp2 = tileB[k * blockSize + threadIdx.x];
-            if (tmp1 != 1) {
-                printf("XX tmp1[j,i]=[%u,%u] = %f\n", gid_j, gid_i, tmp1);
-            }
-            if (tmp2 != 1) {
-                //printf("XX tmp2[j,i]=[%u,%u] = %f\n", gid_j, gid_i, tmp2);
-            }
-            sum += tmp1 * tmp2;
-            //printf("sum[j,i]=[%u,%u] = %f\n", gid_j, gid_i, sum);
+            sum += tileA[threadIdx.y * tileDepth + k] * tileB[k * blockSize + threadIdx.x];
         }
-
-        __syncthreads();
     }
 
-    //printf("[j,i]=[%u,%u] = %f\n", gid_j, gid_i, sum);
     pOutC[gid_j * shapeM + gid_i] = sum;
 }
 
