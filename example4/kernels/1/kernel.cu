@@ -21,14 +21,14 @@ void MatMul(
 
     assert(blockDim.z == 1);
     assert(gridDim.z == 1);
-    const unsigned gid_i = blockIdx.x * blockDim.x + threadIdx.x;
-    const unsigned gid_j = blockIdx.y * blockDim.y + threadIdx.y;
+    const unsigned outI = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned outJ = blockIdx.y * blockDim.y + threadIdx.y;
 
     float sum = 0;
     for (unsigned k = 0; k < shapeK; k++) {
-        sum += pInA[gid_j * shapeK + k] * pInB[k * shapeM + gid_i];
+        sum += pInA[outJ * shapeK + k] * pInB[k * shapeM + outI];
     }
-    pOutC[gid_j * shapeM + gid_i] = sum;
+    pOutC[outJ * shapeM + outI] = sum;
 }
 
 float LaunchMatMul(

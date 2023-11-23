@@ -37,8 +37,6 @@ int main(int argc, char *argv[]) {
         std::cout << "\tK: The number of rows/columns in the common axis." << std::endl;
         return 1;
     }
-
-    constexpr unsigned BLOCKSIZE = 512;
     unsigned shapeN, shapeM, shapeK;
 
     for (int i = 1; i < 4; i++) {
@@ -48,9 +46,6 @@ int main(int argc, char *argv[]) {
         auto [ptr, ec] = std::from_chars(lenStr.data(), lenStr.data() + lenStr.size(), *val);
         assert(ec == std::errc{});
     }
-
-    // Check to make sure BLOCKSIZE is a power of 2.
-    assert((BLOCKSIZE > 0 && ((BLOCKSIZE & (BLOCKSIZE - 1)) == 0)));
 
     CTensor<float> tnA({shapeN, shapeK}), tnB({shapeK, shapeM}), tnC({shapeN, shapeM});
     CRandFiller<float> randFiller(-11.0f, +11.0f);

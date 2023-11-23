@@ -32,8 +32,8 @@ void MatMul(
     __shared__ float tileA[blockSize * tileDepth];
     __shared__ float tileB[tileDepth * blockSize];
 
-    const unsigned gid_i = blockIdx.x * blockDim.x + threadIdx.x;
-    const unsigned gid_j = blockIdx.y * blockDim.y + threadIdx.y;
+    const unsigned outI = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned outJ = blockIdx.y * blockDim.y + threadIdx.y;
 
     unsigned kReps = shapeK / tileDepth;
     assert(shapeK >= tileDepth); // shapeK cannot be less than tileDepth!
@@ -46,7 +46,7 @@ void MatMul(
             // from [0...blockSize) to [0...tileDepth).
             if (equivalentTidX < tileDepth) {
                 unsigned xA = kTile * tileDepth + equivalentTidX;
-                unsigned yA = gid_j;
+                unsigned yA = outJ;
                 if (xA < shapeK && yA < shapeN) {
                     tileA[threadIdx.y * tileDepth + equivalentTidX] = pInA[yA * shapeK + xA];
                 } else {
@@ -56,7 +56,7 @@ void MatMul(
         }
         for (unsigned equivalentTidY = threadIdx.y; equivalentTidY < tileDepth; equivalentTidY += blockSize) {
             if (equivalentTidY < tileDepth) {
-                unsigned xB = gid_i;
+                unsigned xB = outI;
                 unsigned yB = kTile * tileDepth + equivalentTidY;
                 if (xB < shapeM && yB < shapeK) {
                     tileB[equivalentTidY * blockSize + threadIdx.x] = pInB[yB * blockSize + xB];
@@ -73,7 +73,7 @@ void MatMul(
         }
     }
 
-    pOutC[gid_j * shapeM + gid_i] = sum;
+    pOutC[outJ * shapeM + outI] = sum;
 }
 
 float LaunchMatMul(
