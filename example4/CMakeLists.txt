@@ -1,7 +1,7 @@
 set(target_name "MatMul")
 get_filename_component(DIR_NAME ${CMAKE_CURRENT_LIST_DIR} NAME)
 set(KERNEL_EXAMPLE kernel_${DIR_NAME})
-set(${KERNEL_EXAMPLE} 2 CACHE STRING "Integer specifying the kernel version to be used in the compilation of example ${target_name}.")
+set(${KERNEL_EXAMPLE} 3 CACHE STRING "Integer specifying the kernel version to be used in the compilation of example ${target_name}.")
 
 set(kernel_version ${${KERNEL_EXAMPLE}})
 add_executable(${target_name}
