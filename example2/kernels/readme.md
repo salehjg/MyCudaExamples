@@ -1,11 +1,22 @@
 # Results
-Mermaid Test.  
+Mermaid Test.
+
 ```mermaid
-timeline
-    title History of Social Media Platform
-    2002 : LinkedIn
-    2004 : Facebook
-            : Google
-    2005 : Youtube
-    2006 : Twitter
+mindmap
+  root((mindmap))
+    Origins
+      Long history
+      ::icon(fa fa-book)
+      Popularisation
+        British popular psychology author Tony Buzan
+    Research
+      On effectiveness<br/>and features
+      On Automatic creation
+        Uses
+            Creative techniques
+            Strategic planning
+            Argument mapping
+    Tools
+      Pen and paper
+      Mermaid
 ```
